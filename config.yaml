@@ -1,0 +1,19 @@
+model_parameters:
+  H: 0.07          # Hurst Exponant
+  eta: 1.9         # Vol of vol
+  rho: -0.9        # Correlation between price and vol
+  xi: 0.04         # Forward variance
+
+simulation_settings:
+  n_sims: 50000    # Numbers of path of Monte Carlo Sim
+  n_steps: 250     # Numbers of timestep
+  T: 1.0           # Maturity (in years)
+  seed: 42         
+
+numerical_methods:
+  scheme: "hybrid" 
+
+market_data:
+  S0: 100.0        # Initial spot price
+  r: 0.02          # Risk-free rate
+  q: 0.0           # Div yield
