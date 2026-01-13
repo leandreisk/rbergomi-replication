@@ -7,7 +7,7 @@ from scipy.linalg import toeplitz
 import numpy as np
 
 class RBergomiEngine:
-    def __init__(self, T, N, H, eta, rho, xi_0):
+    def __init__(self, T, N, H, eta, rho, xi_0, S_0):
         self.T = T
         self.N = N
         self.dt = T / N
@@ -15,8 +15,9 @@ class RBergomiEngine:
         self.eta = eta
         self.rho = rho
         self.xi_0 = xi_0
+        self.S_0 = S_0
         
-        self.times = np.linspace(0, T, N+1) # Shape (N,)
+        self.times = np.linspace(0, T, N+1)
         
         self.L = self.construct_covariance_matrix()
 
@@ -62,16 +63,24 @@ class RBergomiEngine:
             [cov_vol, cov_cross],
             [cov_cross.T, cov_brown]
         ])
-        L = np.linalg.cholesky(cov)
+        L = np.linalg.cholesky(cov + np.eye(cov.shape[0]) * 1e-9)
         return L
 
     def simulate_paths(self, n_paths):
         """
         Generate v_t and S_T
         """
-        # 1. Générer Gaussiennes Z (2N, n_paths)
-        # 2. Corréler : correlated_bruit = self.L @ Z
-        # 3. Extraire W_tilde (partie 1) et Z_price (partie 2)
-        # 4. Construire v_t = xi_0 * exp(...)
-        # 5. Construire S_t = S_0 * exp(...)
-        pass
+        M = len(self.times)
+        Z = np.random.randn(2*M, n_paths)
+        noise = self.L @ Z
+        W_tilde, Z_price = noise[:M,:], noise[M:,:]
+        t = self.times[:, None]
+        v = self.xi_0 * np.exp(self.eta * W_tilde - 0.5 * self.eta**2 * t**(2 * self.H))
+        dZ = np.diff(Z_price, axis=0)
+        V_start = v[:-1, :]
+        log_returns = np.sqrt(V_start) * dZ - 0.5 * V_start * self.dt
+        cum_log_returns = np.cumsum(log_returns, axis=0)
+        zeros_row = np.zeros((1, n_paths))
+        cum_log_returns_padded = np.vstack([zeros_row, cum_log_returns])
+        S = self.S_0 * np.exp(cum_log_returns_padded)
+        return v, S
