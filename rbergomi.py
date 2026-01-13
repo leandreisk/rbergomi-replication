@@ -16,7 +16,7 @@ class RBergomiEngine:
         self.rho = rho
         self.xi_0 = xi_0
         
-        self.times = np.linspace(0, T, N) # Shape (N,)
+        self.times = np.linspace(0, T, N+1) # Shape (N,)
         
         self.L = self.construct_covariance_matrix()
 
@@ -41,28 +41,29 @@ class RBergomiEngine:
         """
         return np.minimum(self.times[:, None], self.times[None, :])
 
-    def cov_cross_term(self, t_vol_vec, t_price_vec):
+    def cov_cross_term(self):
         """
         Compute E[W_tilde(t_vol) * Z(t_price)]
         Using Bayer et al. (2016) formulas  (Section 4).
         """
         const = self.rho * np.sqrt(2*self.H) / (self.H+0.5)
-        dt_matrix = t_vol_vec[:, None] - np.minimum(t_vol_vec[:, None], t_price_vec[None, :])
-        cov_matrix = const * (t_vol_vec[:, None]**(self.H+0.5) - dt_matrix**(self.H+0.5))
+        dt_matrix = self.times[:, None] - np.minimum(self.times[:, None], self.times[None, :])
+        cov_matrix = const * (self.times[:, None]**(self.H+0.5) - dt_matrix**(self.H+0.5))
         return cov_matrix
 
     def construct_covariance_matrix(self):
         """
         Build the 2N x 2N covariance matrix and use Cholesky decomposition.
         """
-        # Initialiser matrice vide (2N, 2N)
-        # Remplir le bloc haut-gauche (Volterra)
-        # Remplir le bloc bas-droite (Brownien standard: min(ti, tj))
-        # Remplir les blocs croisés (Haut-Droit et Bas-Gauche)
-        
-        # Faire Cholesky
-        # return L
-        pass
+        cov_vol = self.cov_volterra_kernel() 
+        cov_brown = self.cov_brownian()
+        cov_cross = self.cov_cross_term()
+        cov = np.block([
+            [cov_vol, cov_cross],
+            [cov_cross.T, cov_brown]
+        ])
+        L = np.linalg.cholesky(cov)
+        return L
 
     def simulate_paths(self, n_paths):
         """
