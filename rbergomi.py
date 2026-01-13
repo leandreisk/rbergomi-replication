@@ -84,3 +84,71 @@ class RBergomiEngine:
         cum_log_returns_padded = np.vstack([zeros_row, cum_log_returns])
         S = self.S_0 * np.exp(cum_log_returns_padded)
         return v, S
+    
+    def simulate_hybrid_paths(self, n_paths, kappa=1):
+        """
+        Simulation via Schéma Hybride (Bennedsen et al. 2017).
+        Complexité: O(N log N) via FFT.
+        
+        Args:
+            kappa (int): Nombre de pas de temps traités de manière exacte (partie singulière).
+                        kappa=1 est souvent suffisant pour une bonne précision.
+        """
+        # 1. Génération des Bruits de base (Incréments)
+        # On a besoin de dW (pour la vol) et dZ (pour le prix)
+        # Ils sont corrélés avec rho.
+        
+        # a. Générer deux bruits indépendants dW1 et dW2 de taille (N, n_paths)
+        # Ce sont des incréments Gaussiens ~ N(0, dt)
+        
+        # b. Construire les bruits corrélés
+        # dW_vol = dW1
+        # dZ_price = rho * dW1 + sqrt(1 - rho^2) * dW2
+        
+        # 2. Construction du Processus de Volterra (W_tilde) en 2 parties
+        
+        # --- PARTIE A : CONVOLUTION FFT (Le "Long-Terme") ---
+        # On veut calculer la convolution de dW_vol avec le noyau b(t) = t^(H-0.5)
+        # Astuce FFT: Pour éviter la "convolution circulaire" (effets de bord), 
+        # on doit doubler la taille des vecteurs (Padding avec des zéros).
+        
+        # i. Définir le vecteur noyau 'b' sur la grille
+        # b[k] = (t_k)^(H-0.5) pour k allant de 0 à N-1
+        # (Attention à b[0] qui est infini, on le gère dans la partie singulière, 
+        # pour la FFT on peut le mettre à 0 ou l'interpoler)
+        
+        # ii. Padding
+        # Étendre dW_vol et b à la taille 2*N (ajouter des zéros à la fin)
+        
+        # iii. Appliquer la FFT (scipy.fft.fft)
+        # fft_dW = fft(dW_pad)
+        # fft_b = fft(b_pad)
+        
+        # iv. Multiplication dans le domaine fréquentiel
+        # fft_product = fft_dW * fft_b
+        
+        # v. Inverse FFT
+        # convolution_result = ifft(fft_product)
+        
+        # vi. Tronquer
+        # On ne garde que les N premiers points (la partie réelle)
+        # C'est notre intégrale "grossière" I_fft
+        
+        
+        # --- PARTIE B : CORRECTION SINGULIÈRE (Le "Short-Terme") ---
+        # La FFT lisse trop le point t=0. On doit réinjecter l'énergie de la singularité
+        # qui vient des 'kappa' derniers pas de temps.
+        
+        # On calcule explicitement la covariance sur les 'kappa' derniers lags
+        # et on ajuste le résultat de la FFT (soustraire la partie mal intégrée 
+        # et ajouter la partie exacte).
+        # (Pour une implémentation simple "Turbocharging", on peut juste faire :
+        # W_tilde = I_fft (sur les lags > kappa) + Somme_Exacte (sur lags <= kappa))
+        
+        
+        # 3. Reconstitution (Comme avant)
+        # W_tilde = Resultat_Hybrid
+        # V = xi_0 * exp(...)
+        # S = Euler Exponentiel avec dZ_price
+        
+        pass

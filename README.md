@@ -25,15 +25,18 @@ $$v_t = v_0 \exp \left( \eta \sqrt{2H} \int_0^t (t-s)^{H-1/2} dW_s - \frac{1}{2}
 Key focus is placed on the **Hurst exponent ($H$)**. When $H < 0.5$, the model generates the "rough" trajectories necessary to match market-observed volatility surfaces.
 
 ## 🛠 Features & Roadmap
-- [ ] Efficient Monte Carlo pricing for European options.
-- [ ] Implied Volatility (IV) surface generation.
-- [ ] Integration of the Bennedsen et al. (2017) hybrid scheme.
-- [ ] Parallelization with Numba/Multiprocessing.
+- [x] Initial engine implementation via Cholesky decomposition.
+- [ ] Replace Cholesky ($O(N^3)$) with the hybrid scheme ($O(N \log N)$) via FFT to handle large time steps (Bennedsen et al., 2017).
+- [ ] Distributing path simulations across multiple CPU cores.
+- [ ] Implied Volatility (IV) surface generation for European option.
+- [ ] Training an MLP (Multi-Layer Perceptron) for instantaneous inversion of market parameters.
 
 ## 📚 References
 
 This implementation is based on the following seminal work:
 
 * **Bayer, C., Friz, P., & Gatheral, J. (2016).** *Pricing under rough volatility.* Quantitative Finance, 16(6), 887-904.
+
+* **McCrickerd, R., & Pakkanen, M. S. (2018).** *Turbocharging Monte Carlo pricing for the rough Bergomi model.* Quantitative Finance, 18(11), 1877-1886.
 
 * **Bennedsen, M., Lunde, A., & Pakkanen, M. S. (2017).** *Hybrid scheme for Brownian semistationary processes.* Finance and Stochastics, 21(4), 1107-1165.
