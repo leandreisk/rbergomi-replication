@@ -20,26 +20,26 @@ class RBergomiEngine:
         
         self.L = self.construct_covariance_matrix()
 
-    def cov_volterra_kernel(self, t_vec):
+    def cov_volterra_kernel(self):
         """
         Compute E[W_tilde(t1) * W_tilde(t2)]
-        With a simple Riemann sum
+        With a simple Riemann sum to approximate volterra covariance
         """
-        # A CORRIGER
-        kernel_vector = np.zeros_like(t_vec)
-        kernel_vector[1:] = t_vec[1:]**(self.H - 0.5)
-        kernel_vector[0] = (self.dt)**(self.H - 0.5)/np.sqrt(2*self.H)
-        kernel_matrix = toeplitz(kernel_vector, np.zeros_like(kernel_vector))
-        kernel_matrix = np.tril(kernel_matrix)
-        kernel_matrix[0, 0] = 0.0
-        return self.dt*kernel_matrix@kernel_matrix.T
-
-    def cov_brownian(self, t_vec):
+        kernel_vector = np.zeros_like(self.times)
+        kernel_vector[1:] = self.times[1:]**(self.H - 0.5)
+        singular_weight = (self.dt**(self.H - 0.5)) / np.sqrt(2 * self.H)
+        kernel_vector[1] = singular_weight
+        kernel_vector[0] = 0.0
+        K = toeplitz(kernel_vector, r=np.zeros_like(kernel_vector))
+        cov_matrix = self.dt * (K @ K.T)
+        return 2 * self.H * cov_matrix
+    
+    def cov_brownian(self):
         """
         Bloc Bas-Droite (N x N).
         Cov(Z_ti, Z_tj) = min(ti, tj)
         """
-        return np.minimum(t_vec[:, None], t_vec[None, :])
+        return np.minimum(self.times[:, None], self.times[None, :])
 
     def cov_cross_term(self, t_vol_vec, t_price_vec):
         """
