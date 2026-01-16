@@ -24,8 +24,12 @@ class RBergomiEngine:
 
     def _cov_volterra_kernel(self):
         """
-        Compute E[W_tilde(t1) * W_tilde(t2)]
-        With a simple Riemann sum to approximate volterra covariance
+        Compute E[W_tilde(t1) * W_tilde(t2)] via a Riemann sum approximation.
+    
+        Args:
+            None
+        Returns:
+            ndarray: Covariance matrix of shape (M, M), where M = len(self.times).
         """
         kernel_vector = np.zeros_like(self.times)
         kernel_vector[1:] = self.times[1:]**(self.H - 0.5)
@@ -38,15 +42,24 @@ class RBergomiEngine:
     
     def _cov_brownian(self):
         """
-        Bloc Bas-Droite (N x N).
-        Cov(Z_ti, Z_tj) = min(ti, tj)
+        Compute the standard Brownian motion covariance matrix.
+    
+        Args:
+            None
+        Returns:
+            ndarray: Covariance matrix of shape (N+1, N+1).
         """
         return np.minimum(self.times[:, None], self.times[None, :])
 
     def _cov_cross_term(self):
         """
-        Compute E[W_tilde(t_vol) * Z(t_price)]
-        Using Bayer et al. (2016) formulas  (Section 4).
+        Compute the cross-covariance matrix between the Volterra process and Brownian motion from 
+        the closed-form covariance formula from Bayer et al. (2016).
+    
+        Args:
+            None.
+        Returns:
+            ndarray: Cross-covariance matrix of shape (N+1, N+1).
         """
         const = self.rho * np.sqrt(2*self.H) / (self.H+0.5)
         dt_matrix = self.times[:, None] - np.minimum(self.times[:, None], self.times[None, :])
@@ -55,7 +68,12 @@ class RBergomiEngine:
 
     def _build_cholesky_matrix(self):
         """
-        Build the 2N x 2N covariance matrix and use Cholesky decomposition.
+        Construct the joint 2M x 2M covariance matrix and compute its Cholesky factor.
+    
+        Args:
+            None.
+        Returns:
+            None: Stores the lower triangular matrix in self.L.
         """
         cov_vol = self._cov_volterra_kernel() 
         cov_brown = self._cov_brownian()
@@ -68,34 +86,32 @@ class RBergomiEngine:
 
     def simulate_cholesky(self, n_paths):
         """
-        Generate v_t and S_T
-
+        Simulate joint paths for variance (v) and price (S) using a Cholesky decomposition.
+    
         Args:
             n_paths (int): Number of paths (trajectories) to simulate.
+        Returns:
+            tuple: (v, S) as ndarrays of shape (N + 1, n_paths), where M is the number of time steps.
         """
         if self.L is None:
-            print("Compute Cholesky...")
-            start = time.time()
             self._build_cholesky_matrix()
-            print(f"Done in {(time.time() - start):.3f} seconds")
-        start = time.time()
-        print("Computing L*Z...")
+    
         M = len(self.times)
         Z = np.random.randn(2*M, n_paths)
+    
         noise = self.L @ Z
-        print(f"Done in {(time.time() - start):.3f} seconds")
-        start = time.time()
-        print("Computing paths...")
         W_tilde, Z_price = noise[:M,:], noise[M:,:]
+    
         t = self.times[:, None]
         v = self.xi_0 * np.exp(self.eta * W_tilde - 0.5 * self.eta**2 * t**(2 * self.H))
+    
         dZ = np.diff(Z_price, axis=0)
         V_start = v[:-1, :]
         log_returns = np.sqrt(V_start) * dZ - 0.5 * V_start * self.dt
         cum_log_returns = np.cumsum(log_returns, axis=0)
+    
         zeros_row = np.zeros((1, n_paths))
         cum_log_returns_padded = np.vstack([zeros_row, cum_log_returns])
-        print(f"Done in {(time.time() - start):.3f} seconds")
         S = self.S_0 * np.exp(cum_log_returns_padded)
 
         return v, S
@@ -103,47 +119,75 @@ class RBergomiEngine:
     def _generate_hybrid_increments(self, n_paths):
         """
         Generating dW_vol and dZ_price for increments of the process
-
+    
         Args:
             n_paths (int): Number of paths (trajectories) to simulate.
+        Returns:
+            tuple: Two ndarrays (dW_vol, dZ_price) of shape (N, n_paths).
         """
         dW1, dW2 = np.sqrt(self.dt)*np.random.randn(self.N, n_paths), np.sqrt(self.dt)*np.random.randn(self.N, n_paths)
+    
         dW_vol = dW1
         dZ_price = self.rho * dW1 + np.sqrt(1-self.rho**2) * dW2
+    
         return dW_vol, dZ_price
 
     def _fft_convolution(self, dW_vol):
         """
-        Fonction interne pour calculer l'intégrale de Volterra via FFT.
-        """
-        # 1. Créer noyau b
-        # 2. Padding (double taille)
-        # 3. FFT -> Produit -> IFFT
-        # 4. Troncature
-        # Retourne W_tilde
-        pass
+        Compute the Volterra integral via FFT-based linear convolution.
+        Includes a singularity correction for the fractional kernel at the origin.
+
+        Args:
+            dW_vol (ndarray): Brownian increments of shape (N, n_paths).
+        Returns:
+            ndarray: The discretized Volterra process of shape (N + 1, n_paths).
+    """
+        k = np.arange(self.N)
+        t_mid = (k + 0.5) * self.dt
+    
+        b = t_mid ** (self.H - 0.5)
+        b[0] = 0
+        b_padded = np.pad(b, (0, self.N), mode='constant')
+        dW_padded = np.pad(dW_vol, ((0, self.N), (0, 0)), mode='constant')
+    
+        b_freq = np.fft.rfft(b_padded)
+        dW_vol_freq = np.fft.rfft(dW_padded, axis=0)
+    
+        fft_product = dW_vol_freq * b_freq[:, None]
+        W_tilde_fft = np.fft.irfft(fft_product, n=2*self.N, axis=0)[:self.N]
+    
+        w_sing = (self.dt ** (self.H - 0.5)) / np.sqrt(2 * self.H)
+        W_corr = w_sing * dW_vol
+        W_tilde = np.sqrt(2 * self.H) * W_tilde_fft + np.sqrt(2 * self.H) * W_corr
+    
+        n_paths = dW_vol.shape[1]
+        zeros_row = np.zeros((1, n_paths))
+        W_tilde = np.vstack([zeros_row, W_tilde])
+    
+        return W_tilde
 
     def simulate_hybrid(self, n_paths):
         """
-        Simulation via FFT.
-        Le code est 100% autonome ici aussi.
+        Simulate variance (v) and price (S) paths using the hybrid FFT scheme.
+
+        Args:
+            n_paths (int): Number of paths (trajectories) to simulate.
+        Returns:
+            tuple: (v, S) as ndarrays of shape (N + 1, n_paths).
         """
-        # 1. Génération Incréments
         dW_vol, dZ_price = self._generate_hybrid_increments(n_paths)
-        
-        # 2. Calcul W_tilde (Mémoire longue)
+    
         W_tilde = self._fft_convolution(dW_vol)
-        
-        # 3. Calcul Variance (V_t)
-        # v = xi * exp(...) (Même formule que exact)
-        
-        # 4. Calcul Prix (S_t) - Méthode Euler Exponentiel
-        # ATTENTION : Ici dZ_price sont DÉJÀ des sauts (incréments).
-        # On n'utilise PAS np.diff ici.
-        
-        # ... Logique Euler ...
-        # log_ret = sqrt(v) * dZ_price - ...
-        # S = S0 * exp(cumsum(log_ret))
-        
-        pass
-        # return S, v
+    
+        t = self.times[:, None]
+        v = self.xi_0 * np.exp(self.eta * W_tilde - 0.5 * self.eta**2 * t**(2 * self.H))
+    
+        V_start = v[:-1, :]
+        log_returns = np.sqrt(V_start) * dZ_price - 0.5 * V_start * self.dt
+        cum_log_returns = np.cumsum(log_returns, axis=0)
+    
+        zeros_row = np.zeros((1, n_paths))
+        cum_log_returns_padded = np.vstack([zeros_row, cum_log_returns])
+        S = self.S_0 * np.exp(cum_log_returns_padded)
+    
+        return v, S
