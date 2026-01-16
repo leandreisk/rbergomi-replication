@@ -1,5 +1,6 @@
 .DS_Store
 test.ipynb
+git.md
 
 __pycache__/
 *.pyc
