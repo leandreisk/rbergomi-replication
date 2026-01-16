@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd 
 from scipy.linalg import toeplitz
+import time
 
 import numpy as np
 
@@ -19,9 +20,9 @@ class RBergomiEngine:
         
         self.times = np.linspace(0, T, N+1)
         
-        self.L = self.construct_covariance_matrix()
+        self.L = None
 
-    def cov_volterra_kernel(self):
+    def _cov_volterra_kernel(self):
         """
         Compute E[W_tilde(t1) * W_tilde(t2)]
         With a simple Riemann sum to approximate volterra covariance
@@ -35,14 +36,14 @@ class RBergomiEngine:
         cov_matrix = self.dt * (K @ K.T)
         return 2 * self.H * cov_matrix
     
-    def cov_brownian(self):
+    def _cov_brownian(self):
         """
         Bloc Bas-Droite (N x N).
         Cov(Z_ti, Z_tj) = min(ti, tj)
         """
         return np.minimum(self.times[:, None], self.times[None, :])
 
-    def cov_cross_term(self):
+    def _cov_cross_term(self):
         """
         Compute E[W_tilde(t_vol) * Z(t_price)]
         Using Bayer et al. (2016) formulas  (Section 4).
@@ -52,27 +53,39 @@ class RBergomiEngine:
         cov_matrix = const * (self.times[:, None]**(self.H+0.5) - dt_matrix**(self.H+0.5))
         return cov_matrix
 
-    def construct_covariance_matrix(self):
+    def _build_cholesky_matrix(self):
         """
         Build the 2N x 2N covariance matrix and use Cholesky decomposition.
         """
-        cov_vol = self.cov_volterra_kernel() 
-        cov_brown = self.cov_brownian()
-        cov_cross = self.cov_cross_term()
+        cov_vol = self._cov_volterra_kernel() 
+        cov_brown = self._cov_brownian()
+        cov_cross = self._cov_cross_term()
         cov = np.block([
             [cov_vol, cov_cross],
             [cov_cross.T, cov_brown]
         ])
-        L = np.linalg.cholesky(cov + np.eye(cov.shape[0]) * 1e-9)
-        return L
+        self.L = np.linalg.cholesky(cov + np.eye(cov.shape[0]) * 1e-9)
 
-    def simulate_paths(self, n_paths):
+    def simulate_cholesky(self, n_paths):
         """
         Generate v_t and S_T
+
+        Args:
+            n_paths (int): Number of paths (trajectories) to simulate.
         """
+        if self.L is None:
+            print("Compute Cholesky...")
+            start = time.time()
+            self._build_cholesky_matrix()
+            print(f"Done in {(time.time() - start):.3f} seconds")
+        start = time.time()
+        print("Computing L*Z...")
         M = len(self.times)
         Z = np.random.randn(2*M, n_paths)
         noise = self.L @ Z
+        print(f"Done in {(time.time() - start):.3f} seconds")
+        start = time.time()
+        print("Computing paths...")
         W_tilde, Z_price = noise[:M,:], noise[M:,:]
         t = self.times[:, None]
         v = self.xi_0 * np.exp(self.eta * W_tilde - 0.5 * self.eta**2 * t**(2 * self.H))
@@ -82,73 +95,55 @@ class RBergomiEngine:
         cum_log_returns = np.cumsum(log_returns, axis=0)
         zeros_row = np.zeros((1, n_paths))
         cum_log_returns_padded = np.vstack([zeros_row, cum_log_returns])
+        print(f"Done in {(time.time() - start):.3f} seconds")
         S = self.S_0 * np.exp(cum_log_returns_padded)
+
         return v, S
     
-    def simulate_hybrid_paths(self, n_paths, kappa=1):
+    def _generate_hybrid_increments(self, n_paths):
         """
-        Simulation via Schéma Hybride (Bennedsen et al. 2017).
-        Complexité: O(N log N) via FFT.
-        
+        Generating dW_vol and dZ_price for increments of the process
+
         Args:
-            kappa (int): Nombre de pas de temps traités de manière exacte (partie singulière).
-                        kappa=1 est souvent suffisant pour une bonne précision.
+            n_paths (int): Number of paths (trajectories) to simulate.
         """
-        # 1. Génération des Bruits de base (Incréments)
-        # On a besoin de dW (pour la vol) et dZ (pour le prix)
-        # Ils sont corrélés avec rho.
+        dW1, dW2 = np.sqrt(self.dt)*np.random.randn(self.N, n_paths), np.sqrt(self.dt)*np.random.randn(self.N, n_paths)
+        dW_vol = dW1
+        dZ_price = self.rho * dW1 + np.sqrt(1-self.rho**2) * dW2
+        return dW_vol, dZ_price
+
+    def _fft_convolution(self, dW_vol):
+        """
+        Fonction interne pour calculer l'intégrale de Volterra via FFT.
+        """
+        # 1. Créer noyau b
+        # 2. Padding (double taille)
+        # 3. FFT -> Produit -> IFFT
+        # 4. Troncature
+        # Retourne W_tilde
+        pass
+
+    def simulate_hybrid(self, n_paths):
+        """
+        Simulation via FFT.
+        Le code est 100% autonome ici aussi.
+        """
+        # 1. Génération Incréments
+        dW_vol, dZ_price = self._generate_hybrid_increments(n_paths)
         
-        # a. Générer deux bruits indépendants dW1 et dW2 de taille (N, n_paths)
-        # Ce sont des incréments Gaussiens ~ N(0, dt)
+        # 2. Calcul W_tilde (Mémoire longue)
+        W_tilde = self._fft_convolution(dW_vol)
         
-        # b. Construire les bruits corrélés
-        # dW_vol = dW1
-        # dZ_price = rho * dW1 + sqrt(1 - rho^2) * dW2
+        # 3. Calcul Variance (V_t)
+        # v = xi * exp(...) (Même formule que exact)
         
-        # 2. Construction du Processus de Volterra (W_tilde) en 2 parties
+        # 4. Calcul Prix (S_t) - Méthode Euler Exponentiel
+        # ATTENTION : Ici dZ_price sont DÉJÀ des sauts (incréments).
+        # On n'utilise PAS np.diff ici.
         
-        # --- PARTIE A : CONVOLUTION FFT (Le "Long-Terme") ---
-        # On veut calculer la convolution de dW_vol avec le noyau b(t) = t^(H-0.5)
-        # Astuce FFT: Pour éviter la "convolution circulaire" (effets de bord), 
-        # on doit doubler la taille des vecteurs (Padding avec des zéros).
-        
-        # i. Définir le vecteur noyau 'b' sur la grille
-        # b[k] = (t_k)^(H-0.5) pour k allant de 0 à N-1
-        # (Attention à b[0] qui est infini, on le gère dans la partie singulière, 
-        # pour la FFT on peut le mettre à 0 ou l'interpoler)
-        
-        # ii. Padding
-        # Étendre dW_vol et b à la taille 2*N (ajouter des zéros à la fin)
-        
-        # iii. Appliquer la FFT (scipy.fft.fft)
-        # fft_dW = fft(dW_pad)
-        # fft_b = fft(b_pad)
-        
-        # iv. Multiplication dans le domaine fréquentiel
-        # fft_product = fft_dW * fft_b
-        
-        # v. Inverse FFT
-        # convolution_result = ifft(fft_product)
-        
-        # vi. Tronquer
-        # On ne garde que les N premiers points (la partie réelle)
-        # C'est notre intégrale "grossière" I_fft
-        
-        
-        # --- PARTIE B : CORRECTION SINGULIÈRE (Le "Short-Terme") ---
-        # La FFT lisse trop le point t=0. On doit réinjecter l'énergie de la singularité
-        # qui vient des 'kappa' derniers pas de temps.
-        
-        # On calcule explicitement la covariance sur les 'kappa' derniers lags
-        # et on ajuste le résultat de la FFT (soustraire la partie mal intégrée 
-        # et ajouter la partie exacte).
-        # (Pour une implémentation simple "Turbocharging", on peut juste faire :
-        # W_tilde = I_fft (sur les lags > kappa) + Somme_Exacte (sur lags <= kappa))
-        
-        
-        # 3. Reconstitution (Comme avant)
-        # W_tilde = Resultat_Hybrid
-        # V = xi_0 * exp(...)
-        # S = Euler Exponentiel avec dZ_price
+        # ... Logique Euler ...
+        # log_ret = sqrt(v) * dZ_price - ...
+        # S = S0 * exp(cumsum(log_ret))
         
         pass
+        # return S, v
