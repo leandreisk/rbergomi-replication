@@ -28,7 +28,7 @@ Key focus is placed on the **Hurst exponent ($H$)**. When $H < 0.5$, the model g
 - [x] Initial engine implementation via Cholesky decomposition.
 - [x] Replace Cholesky $(O(N^3))$ with the hybrid scheme $(O(N \log N))$ via FFT to handle large time steps (Bennedsen et al., 2017).
 - [x] Compare the speed of the hybrid and Cholesky schemes.
-- [ ] Implied Volatility (IV) surface generation for European option.
+- [x] Implied Volatility (IV) surface generation for European option.
 - [ ] Training an MLP (Multi-Layer Perceptron) for instantaneous inversion of market parameters.
 - [ ] SDE Simulation via Neural SDEs
 
