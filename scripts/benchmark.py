@@ -20,7 +20,7 @@ def run_benchmark(custom_range_n=None):
     Args:
         custom_n_values (int, optional): Numbers of N to test.
     """
-    with open('../config.yaml', 'r') as file:
+    with open('./config.yaml', 'r') as file:
         data = yaml.load(file, Loader=yaml.SafeLoader)
     T = data["model_parameters"]["T"]
     H = data["model_parameters"]["H"]
