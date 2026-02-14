@@ -12,6 +12,7 @@ __pycache__/
 .venv_wsl/
 venv/
 ENV/
+smiles/
 
 .ipynb_checkpoints/
 
