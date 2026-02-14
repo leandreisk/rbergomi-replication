@@ -1,10 +1,13 @@
 import sys
 import os
+import time
 import yaml
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.interpolate import make_interp_spline
+from scipy.stats import norm
+
 plt.style.use('seaborn-v0_8-whitegrid')
-import time
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, '..'))
@@ -12,6 +15,17 @@ sys.path.append(project_root)
 
 from src.engine.rbergomi import RBergomiEngine
 from src.pricing.pricer import MonteCarloPricer
+
+def delta_to_strike(delta_call, S, T, sigma):
+    delta_call = np.clip(delta_call, 1e-6, 1.0 - 1e-6)
+    
+    d1 = norm.ppf(delta_call)
+    
+    sigma_sqrt_t = sigma * np.sqrt(T)
+    log_moneyness = d1 * sigma_sqrt_t - 0.5 * sigma**2 * T
+    
+    K = S * np.exp(-log_moneyness)
+    return K
 
 def plot_volatility_term_structure():
     """
@@ -48,7 +62,16 @@ def plot_volatility_term_structure():
 
     for T, color, label, ran in scenarios:
         k_range = np.linspace(ran[0], ran[1], 50)
+        deltas = np.linspace(0.95, 0.05, 19)
         t0 = time.time()
+
+        strikes = []
+        vol_approx = np.sqrt(xi_0)
+        for d in deltas:
+            k = delta_to_strike(d, S_0, T, vol_approx)
+            strikes.append(k)
+        strikes = np.array(strikes)
+        k_range = np.log(strikes / S_0)
         
         engine = RBergomiEngine(T, N, H, eta, rho, xi_0, S_0)
         pricer = MonteCarloPricer(engine)
@@ -59,10 +82,21 @@ def plot_volatility_term_structure():
             
             valid_mask = ~np.isnan(iv_out) & (iv_out > 1e-6)
 
-            k_plot = k_range[valid_mask]
-            iv_plot = iv_out[valid_mask]
+            x = k_range[valid_mask]
+            y = iv_out[valid_mask]
 
-            plt.plot(k_plot, iv_plot, color=color, linewidth=2, label=label)
+            if len(x) > 3:
+                x_smooth = np.linspace(x.min(), x.max(), 200)
+                
+                spline = make_interp_spline(x, y, k=3)
+                y_smooth = spline(x_smooth)
+                
+                plt.plot(x_smooth, y_smooth, color=color, linewidth=2, label=label)
+                
+                plt.plot(x, y, 'o', color=color, markersize=4, alpha=0.4)
+            
+            else:
+                plt.plot(x, y, 'o-', color=color, label=label)
             
             dt = time.time() - t0
             print(f"  -> Finished {label} in {dt:.2f}s")
@@ -79,12 +113,11 @@ def plot_volatility_term_structure():
     
     output_dir = os.path.join(project_root, "out", "smiles")
     os.makedirs(output_dir, exist_ok=True)
-    filename = f"term_structure_H{H}_rho{rho}_eta{eta}_xi{xi_0}_N{N}.png"
+    filename = f"term_structure_H{H}_rho{rho}_eta{eta}_N{N}.png"
     save_path = os.path.join(output_dir, filename)
     
     plt.savefig(save_path)
     print(f"\nGraph saved to: {save_path}")
-    plt.show()
 
 if __name__ == "__main__":
     plot_volatility_term_structure()

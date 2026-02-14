@@ -9,5 +9,5 @@ model_parameters:
 
 
 simulation_settings:
-  n_paths: 1_000    # Numbers of path of Monte Carlo Sim
+  n_paths: 50_000    # Numbers of path of Monte Carlo Sim
   seed: 42         

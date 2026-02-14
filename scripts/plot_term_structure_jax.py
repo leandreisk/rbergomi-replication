@@ -24,12 +24,6 @@ from src.pricing.pricer_jax import MonteCarloPricerJAX
 plt.style.use('seaborn-v0_8-whitegrid')
 
 def delta_to_strike(delta_call, S, T, sigma):
-    """
-    Convertit un Delta de Call en Strike K.
-    Delta_Call = N(d1)
-    Si delta -> 1, K -> 0 (Deep ITM)
-    Si delta -> 0, K -> inf (Deep OTM)
-    """
     delta_call = jnp.clip(delta_call, 1e-6, 1.0 - 1e-6)
     
     d1 = norm.ppf(delta_call)
@@ -102,7 +96,6 @@ def plot_volatility_term_structure():
         for d in deltas:
             k = delta_to_strike(d, S_0, T, vol_approx)
             strikes.append(k)
-            
         strikes_jax = jnp.array(strikes)
         k_range_jax = jnp.log(strikes_jax / S_0)
         
