@@ -1,13 +1,13 @@
 model_parameters:
   T: 1.0           # Maturity (in years)
-  n_steps: 500     # Numbers of timestep
-  H: 0.5         # Hurst Exponant
+  n_steps: 312     # Numbers of timestep
+  H: 0.07        # Hurst Exponant
   eta: 1.9         # Vol of vol
-  rho: 0        # Correlation between price and vol
-  xi: 0.04         # Forward variance
+  rho: -0.9    # Correlation between price and vol
+  xi: 0.055225         # Forward variance
   S0: 100.0        # Initial spot price
 
 
 simulation_settings:
-  n_paths: 50000    # Numbers of path of Monte Carlo Sim
+  n_paths: 1_000_000    # Numbers of path of Monte Carlo Sim
   seed: 42         
