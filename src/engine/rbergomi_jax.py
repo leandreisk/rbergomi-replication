@@ -46,12 +46,12 @@ class RBergomiJAXEngine:
             
         Returns:
             tuple: (v, S)
-                 v: Variance paths (N+1, n_paths)
-                 S: Price paths (N+1, n_paths)
+                v: Variance paths (N+1, n_paths)
+                S: Price paths (N+1, n_paths)
         """
         if n_paths % 2 != 0:
             raise ValueError(f"n_paths ({n_paths}) must be even for antithetic variates.")
-            
+
         n_half = n_paths // 2
 
         key1, key2 = jax.random.split(key)
