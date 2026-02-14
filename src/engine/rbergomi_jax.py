@@ -49,10 +49,18 @@ class RBergomiJAXEngine:
                  v: Variance paths (N+1, n_paths)
                  S: Price paths (N+1, n_paths)
         """
-        key1, key2 = jax.random.split(key)
-        dW1 = self.sqrt_dt * jax.random.normal(key1, shape=(self.N, n_paths))
-        dW2 = self.sqrt_dt * jax.random.normal(key2, shape=(self.N, n_paths))
+        if n_paths % 2 != 0:
+            raise ValueError(f"n_paths ({n_paths}) must be even for antithetic variates.")
+            
+        n_half = n_paths // 2
 
+        key1, key2 = jax.random.split(key)
+        
+        dW1_half = self.sqrt_dt * jax.random.normal(key1, shape=(self.N, n_half))
+        dW2_half = self.sqrt_dt * jax.random.normal(key2, shape=(self.N, n_half))
+
+        dW1 = jnp.concatenate([dW1_half, -dW1_half], axis=1)
+        dW2 = jnp.concatenate([dW2_half, -dW2_half], axis=1)
         dW_vol = dW1
         dZ_price = self.rho * dW1 + self.sqrt_one_minus_rho2 * dW2
 
