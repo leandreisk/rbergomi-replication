@@ -44,6 +44,9 @@ def plot_volatility_term_structure():
     
     N = data["model_parameters"]["n_steps"]      
     n_paths = data["simulation_settings"]["n_paths"]
+    seed = data["simulation_settings"]["seed"]
+
+    np.random.seed(seed)
 
     cmap = plt.get_cmap('viridis') # 'plasma' 'coolwarm' 'magma' 'viridis'
     colors = [cmap(i) for i in [0.1, 0.25, 0.4, 0.6, 0.8, 0.95][::-1]]

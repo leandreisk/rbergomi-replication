@@ -123,7 +123,16 @@ class RBergomiEngine:
         Returns:
             tuple: Two ndarrays (dW_vol, dZ_price) of shape (N, n_paths).
         """
-        dW1, dW2 = np.sqrt(self.dt)*np.random.randn(self.N, n_paths), np.sqrt(self.dt)*np.random.randn(self.N, n_paths)
+        half_paths = n_paths // 2
+        
+        z1 = np.random.randn(self.N, half_paths)
+        z2 = np.random.randn(self.N, half_paths)
+
+        z1_full = np.concatenate([z1, -z1], axis=1)
+        z2_full = np.concatenate([z2, -z2], axis=1)
+
+        dW1 = np.sqrt(self.dt) * z1_full
+        dW2 = np.sqrt(self.dt) * z2_full
     
         dW_vol = dW1
         dZ_price = self.rho * dW1 + np.sqrt(1-self.rho**2) * dW2

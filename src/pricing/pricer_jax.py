@@ -76,7 +76,7 @@ class MonteCarloPricerJAX:
             _, S = self.engine.simulate_hybrid(subkey, self.batch_size)
             S_T = S[-1, :] # (batch_size,)
             
-            batch_payoffs = payoff_fn(S_T) # Shape (n_strikes,) ou (1,)
+            batch_payoffs = payoff_fn(S_T) # Shape (n_strikes,) or (1,)
             
             if total_payoff_sum is None:
                 total_payoff_sum = batch_payoffs

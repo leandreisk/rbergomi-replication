@@ -36,31 +36,19 @@ def delta_to_strike(delta_call, S, T, sigma):
 
 def plot_volatility_term_structure():
     config_path = os.path.join(project_root, 'config.yaml')
-    try:
-        with open(config_path, 'r') as file:
-            data = yaml.load(file, Loader=yaml.SafeLoader)
-        
-        H = data["model_parameters"]["H"]
-        eta = data["model_parameters"]["eta"]
-        rho = data["model_parameters"]["rho"]
-        xi_0 = data["model_parameters"]["xi"]
-        S_0 = data["model_parameters"]["S0"]
-        
-        N = data["model_parameters"]["n_steps"]
-        n_paths_total = data["simulation_settings"]["n_paths"]
-        seed = data["simulation_settings"]["seed"]
-        
-    except FileNotFoundError:
-        print("Warning: config.yaml not found. Using default parameters.")
-        xi_0 = 0.235**2 
-        eta = 1.9
-        H = 0.07
-        rho = -0.9
-        S_0 = 100.0
+    with open(config_path, 'r') as file:
+        data = yaml.load(file, Loader=yaml.SafeLoader)
 
-        N = 312 
-        n_paths_total = 400_000 
+    H = data["model_parameters"]["H"]
+    eta = data["model_parameters"]["eta"]
+    rho = data["model_parameters"]["rho"]
+    xi_0 = data["model_parameters"]["xi"]
+    S_0 = data["model_parameters"]["S0"]
     
+    N = data["model_parameters"]["n_steps"]
+    n_paths_total = data["simulation_settings"]["n_paths"]
+    seed = data["simulation_settings"]["seed"]
+
     BATCH_SIZE = 50_000
     
     cmap = plt.get_cmap('viridis')

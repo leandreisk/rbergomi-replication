@@ -99,7 +99,7 @@ class MonteCarloPricer:
         """
         self.engine = engine
 
-    def price_european_option(self, K, n_paths, option_type='call', return_iv=False):
+    def price_european_option(self, K, n_paths, option_type='call', return_iv=False, S=None):
         """
         Prices European options for a range of strikes.
 
@@ -114,7 +114,8 @@ class MonteCarloPricer:
         """
         K = np.atleast_1d(K)
         o_type = 1 if option_type=='call' else -1
-        v, S = self.engine.simulate_hybrid(n_paths)
+        if S is None :
+            _, S = self.engine.simulate_hybrid(n_paths)
         S_T = S[-1]
         
         payoffs = np.maximum(o_type*(S_T[:, np.newaxis] - K), 0)
@@ -149,6 +150,7 @@ class MonteCarloPricer:
         
         ivs = np.zeros_like(K_values)
         prices = np.zeros_like(K_values)
+        _, S = self.engine.simulate_hybrid(n_paths)
         
         #  OTM PUTS
         if np.any(mask_puts):
@@ -157,7 +159,8 @@ class MonteCarloPricer:
                 K_puts, 
                 n_paths, 
                 option_type='put',
-                return_iv=True
+                return_iv=True,
+                S=S
             )
             ivs[mask_puts] = iv_puts
             prices[mask_puts] = prices_put
@@ -169,7 +172,8 @@ class MonteCarloPricer:
                 K_calls, 
                 n_paths, 
                 option_type='call',
-                return_iv=True
+                return_iv=True,
+                S=S
             )
             ivs[mask_calls] = iv_calls
             prices[mask_calls] = prices_call
