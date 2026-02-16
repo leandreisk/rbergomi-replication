@@ -3,9 +3,10 @@ model_parameters:
   n_steps: 500     # Numbers of timestep
   H: 0.07        # Hurst Exponant
   eta: 1.9         # Vol of vol
-  rho: -0.9    # Correlation between price and vol
+  rho: 0    # Correlation between price and vol
   xi: 0.055225         # Forward variance
   S0: 100.0        # Initial spot price
+  r: 0.0 # Risk free rate 
 
 
 simulation_settings:

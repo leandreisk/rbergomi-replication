@@ -41,7 +41,7 @@ def plot_volatility_term_structure():
     rho = data["model_parameters"]["rho"]
     xi_0 = data["model_parameters"]["xi"]
     S_0 = data["model_parameters"]["S0"]
-    
+    r = data["model_parameters"]["r"]
     N = data["model_parameters"]["n_steps"]      
     n_paths = data["simulation_settings"]["n_paths"]
     seed = data["simulation_settings"]["seed"]
@@ -76,12 +76,12 @@ def plot_volatility_term_structure():
         strikes = np.array(strikes)
         k_range = np.log(strikes / S_0)
         
-        engine = RBergomiEngine(T, N, H, eta, rho, xi_0, S_0)
+        engine = RBergomiEngine(T, N, H, eta, rho, xi_0, S_0, r)
         pricer = MonteCarloPricer(engine)
         k_out = S_0 * np.exp(k_range)
         
         try:
-            prices, iv_out = pricer.compute_smile(k_range, n_paths)
+            prices, iv_out = pricer.compute_smile_turbo(k_range, n_paths)
             
             valid_mask = ~np.isnan(iv_out) & (iv_out > 1e-6)
 

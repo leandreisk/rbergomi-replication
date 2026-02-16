@@ -6,7 +6,7 @@ import time
 import numpy as np
 
 class RBergomiEngine:
-    def __init__(self, T, N, H, eta, rho, xi_0, S_0):
+    def __init__(self, T, N, H, eta, rho, xi_0, S_0, r):
         self.T = T
         self.N = N
         self.dt = T / N
@@ -15,6 +15,7 @@ class RBergomiEngine:
         self.rho = rho
         self.xi_0 = xi_0
         self.S_0 = S_0
+        self.r = r
         
         self.times = np.linspace(0, T, N+1)
         
@@ -105,7 +106,7 @@ class RBergomiEngine:
     
         dZ = np.diff(Z_price, axis=0)
         V_start = v[:-1, :]
-        log_returns = np.sqrt(V_start) * dZ - 0.5 * V_start * self.dt
+        log_returns = np.sqrt(V_start) * dZ + (self.r - 0.5 * V_start) * self.dt
         cum_log_returns = np.cumsum(log_returns, axis=0)
     
         zeros_row = np.zeros((1, n_paths))
@@ -190,7 +191,7 @@ class RBergomiEngine:
         v = self.xi_0 * np.exp(self.eta * W_tilde - 0.5 * self.eta**2 * t**(2 * self.H))
     
         V_start = v[:-1, :]
-        log_returns = np.sqrt(V_start) * dZ_price - 0.5 * V_start * self.dt
+        log_returns = np.sqrt(V_start) * dZ_price + (self.r - 0.5 * V_start) * self.dt
         cum_log_returns = np.cumsum(log_returns, axis=0)
     
         zeros_row = np.zeros((1, n_paths))
