@@ -12,6 +12,7 @@ def clean_and_filter_options(df):
     mask_liq = (
         (df['best_bid'] > 0) & 
         (df['impl_volatility'].between(0.01, 2.0)) & 
+        (df['moneyness'].between(0.70, 1.3)) &
         (df['open_interest'] > 10) &
         (df['volume'] > 5) &
         (df['stock_price'] > 0) &
@@ -43,4 +44,4 @@ def get_calibration_snapshot(df, target_date, target_maturity, tolerance=0.05):
 
     data = snapshot[snapshot['years_to_maturity'] == closest].sort_values('strike')
     
-    return data, closest, snapshot['stock_price'].iloc[0]
+    return data, closest, snapshot['stock_price'].iloc[0], snapshot["risk_free_rate"].iloc[0]
