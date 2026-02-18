@@ -13,6 +13,7 @@ __pycache__/
 venv/
 ENV/
 smiles/
+dorion_francois/
 
 .ipynb_checkpoints/
 
