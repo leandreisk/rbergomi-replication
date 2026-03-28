@@ -94,7 +94,7 @@ def implied_volatility(price, S, K, T, r, option_type='call'):
     ivs = np.zeros(n)
 
     def _solve_single_iv(p, k):
-        intrinsic = max(0.0, S - k) if option_type == 'call' else max(0.0, k - S)
+        intrinsic = max(0.0, S - k) if (option_type == 'call') else max(0.0, k - S)
         if p < intrinsic or p < 1e-6:
             return np.nan
 
@@ -144,7 +144,7 @@ class MonteCarloPricer:
         K = np.atleast_1d(K)
         o_type = 1 if option_type=='call' else -1
         if S is None :
-            _, S = self.engine.simulate_hybrid(n_paths)
+            _, S = self.engine.simulate_cholesky(n_paths)
         S_T = S[-1]
         
         payoffs = np.maximum(o_type*(S_T[:, np.newaxis] - K), 0)
@@ -153,8 +153,10 @@ class MonteCarloPricer:
         
         std_err = np.std(payoffs, axis=0) / np.sqrt(n_paths)
         
+        S_adj = self.engine.S_0 * np.exp(-self.engine.q * self.engine.T)
+        
         if return_iv :
-            iv = implied_volatility(price, self.engine.S_0, K, self.engine.T, self.engine.r, option_type=option_type)
+            iv = implied_volatility(price, S_adj, K, self.engine.T, self.engine.r, option_type=option_type)
             return price, std_err, iv
         else :
             return price, std_err, None 
@@ -166,8 +168,8 @@ class MonteCarloPricer:
         rho = self.engine.rho
 
         if increments is None :
-            dW_vol, _ = self.engine._generate_hybrid_increments(n_paths)
-            W_tilde = self.engine._fft_convolution(dW_vol)
+            dW_vol, _, z_ortho = self.engine._generate_hybrid_increments(n_paths)
+            W_tilde = self.engine._fft_convolution(dW_vol, z_ortho)
         else : 
             dW_vol, W_tilde = increments[0], increments[1]
         t_vec = self.engine.times[:, None] # Shape (N+1, 1)
@@ -176,11 +178,11 @@ class MonteCarloPricer:
         
         V_start = V[:-1, :] 
         
-        IV = np.sum(V_start, axis=0) * dt
+        IV = np.sum(0.5 * (V[:-1, :] + V[1:, :]), axis=0) * dt
         
         stoch_int_W1 = np.sum(np.sqrt(V_start) * dW_vol, axis=0)
         
-        log_S1 = self.engine.r * T -0.5 * (rho**2) * IV + rho * stoch_int_W1
+        log_S1 = (self.engine.r - self.engine.q) * T -0.5 * (rho**2) * IV + rho * stoch_int_W1
         S1_T = self.engine.S_0 * np.exp(log_S1)
         
         residual_var = (1 - rho**2) * IV
@@ -190,8 +192,14 @@ class MonteCarloPricer:
         
         control_var = rho**2 * (Q_hat - IV)
         Y = bs_price_vectorized(control_var, S1_T, K, option_type)
-        
-        E_Y = bs_price_vectorized(np.full_like(IV, rho**2 * Q_hat), self.engine.S_0 * np.exp(self.engine.r * T), K, option_type)
+
+        forward_price = self.engine.S_0 * np.exp((self.engine.r - self.engine.q) * T)
+        E_Y = bs_price_vectorized(
+            np.full_like(IV, rho**2 * Q_hat), 
+            forward_price, 
+            K, 
+            option_type
+        )
         
         mean_X = np.mean(X, axis=0)
         mean_Y = np.mean(Y, axis=0)
@@ -202,11 +210,11 @@ class MonteCarloPricer:
         alpha = np.zeros_like(mean_X)
         mask = var_Y > 1e-12
         alpha[mask] = -cov_XY[mask] / var_Y[mask]
-        
+        alpha = np.clip(alpha, -2.0, 0.0)
         controlled_samples = X + alpha * (Y - E_Y)
         price = np.exp(-self.engine.r*self.engine.T)*np.mean(controlled_samples, axis=0)
         
-        std_err = np.std(controlled_samples, axis=0) / np.sqrt(n_paths)
+        std_err = np.exp(-self.engine.r*self.engine.T)*np.std(controlled_samples, axis=0) / np.sqrt(n_paths)
         
         if return_iv:
             iv = implied_volatility(price, self.engine.S_0, K, T, self.engine.r, option_type)
@@ -283,9 +291,8 @@ class MonteCarloPricer:
         
         ivs = np.zeros_like(K_values)
         prices = np.zeros_like(K_values)
-        # _, S = self.engine.simulate_hybrid(n_paths)
-        dW_vol, _ = self.engine._generate_hybrid_increments(n_paths)
-        W_tilde = self.engine._fft_convolution(dW_vol)
+        dW_vol, _, z_ortho = self.engine._generate_hybrid_increments(n_paths)
+        W_tilde = self.engine._fft_convolution(dW_vol, z_ortho)
         increments = (dW_vol, W_tilde)
         
         

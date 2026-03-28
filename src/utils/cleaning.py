@@ -14,7 +14,7 @@ def clean_and_filter_options(df):
         (df['impl_volatility'].between(0.01, 2.0)) & 
         (df['moneyness'].between(0.70, 1.3)) &
         (df['open_interest'] > 10) &
-        (df['volume'] > 5) &
+        (df['volume'] > 10) &
         (df['stock_price'] > 0) &
         (df['strike'] > 0)
     )

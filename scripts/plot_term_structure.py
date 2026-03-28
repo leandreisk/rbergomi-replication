@@ -27,7 +27,7 @@ def delta_to_strike(delta_call, S, T, sigma):
     K = S * np.exp(-log_moneyness)
     return K
 
-def plot_volatility_term_structure():
+def plot_volatility_term_structure(H=None, rho=None, show=False, save=True):
     """
     Reproduces the Volatility Term Structure graph (McCrickerd & Pakkanen).
     Plots Smiles for maturities: 1 Week, 1 Month, 3 Months, 6 Months, 1 Year.
@@ -35,17 +35,16 @@ def plot_volatility_term_structure():
     with open('./config.yaml', 'r') as file:
         data = yaml.load(file, Loader=yaml.SafeLoader)
 
+    if not H : H = data["model_parameters"]["H"]
+    if rho == None : rho = data["model_parameters"]["rho"]
     T = data["model_parameters"]["T"]
-    H = data["model_parameters"]["H"]
     eta = data["model_parameters"]["eta"]
-    rho = data["model_parameters"]["rho"]
     xi_0 = data["model_parameters"]["xi"]
     S_0 = data["model_parameters"]["S0"]
     r = data["model_parameters"]["r"]
     N = data["model_parameters"]["n_steps"]      
     n_paths = data["simulation_settings"]["n_paths"]
     seed = data["simulation_settings"]["seed"]
-
     np.random.seed(seed)
 
     cmap = plt.get_cmap('viridis') # 'plasma' 'coolwarm' 'magma' 'viridis'
@@ -119,8 +118,9 @@ def plot_volatility_term_structure():
     filename = f"term_structure_H{H}_rho{rho}_eta{eta}_N{N}.png"
     save_path = os.path.join(output_dir, filename)
     
-    plt.savefig(save_path)
-    print(f"\nGraph saved to: {save_path}")
+    if save : 
+        plt.savefig(save_path)
+        print(f"\nGraph saved to: {save_path}")
 
 if __name__ == "__main__":
     plot_volatility_term_structure()
