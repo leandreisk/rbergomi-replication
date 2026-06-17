@@ -115,12 +115,14 @@ def plot_volatility_term_structure(H=None, rho=None, show=False, save=True):
     
     output_dir = os.path.join(project_root, "out", "smiles")
     os.makedirs(output_dir, exist_ok=True)
-    filename = f"term_structure_H{H}_rho{rho}_eta{eta}_N{N}.png"
+    filename = f"term_structure_H{H}_rho{rho}_eta{eta}_N{N}.pdf"
     save_path = os.path.join(output_dir, filename)
-    
+
     if save : 
         plt.savefig(save_path)
         print(f"\nGraph saved to: {save_path}")
+
+    plt.show()
 
 if __name__ == "__main__":
     plot_volatility_term_structure()

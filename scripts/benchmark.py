@@ -11,7 +11,6 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 from src.engine.rbergomi import RBergomiEngine
-from src.engine.rbergomi_jax import RBergomiJAXEngine
 
 def run_benchmark(custom_range_n=None):
     """
